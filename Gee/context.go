@@ -16,9 +16,19 @@ type Context struct {
 	//request info
 	Path   string
 	Method string
+	Params map[string]string
 
 	//response info
 	StatusCode int
+
+	// middleware
+	handlers []HandlerFunc
+	index    int
+}
+
+func (c *Context) Param(key string) string {
+	value, _ := c.Params[key]
+	return value
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
@@ -27,6 +37,15 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index:  -1,
+	}
+}
+
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
 	}
 }
 
@@ -53,7 +72,7 @@ func (c *Context) String(code int, format string, values ...interface{}) {
 	c.Writer.Write([]byte(fmt.Sprintf(format, values...)))
 }
 
-func (c Context) Json(code int, obj interface{}) {
+func (c *Context) Json(code int, obj interface{}) {
 	c.SetHeader("Content-Type", "application/json")
 	c.Status(code)
 	encoder := json.NewEncoder(c.Writer)
@@ -62,12 +81,12 @@ func (c Context) Json(code int, obj interface{}) {
 	}
 }
 
-func (c Context) Data(code int, data []byte) {
+func (c *Context) Data(code int, data []byte) {
 	c.Status(code)
 	c.Writer.Write(data)
 }
 
-func (c Context) HTML(code int, html string) {
+func (c *Context) HTML(code int, html string) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
 	c.Writer.Write([]byte(html))
